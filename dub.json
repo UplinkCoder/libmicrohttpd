@@ -1,0 +1,10 @@
+{
+	"name": "rte",
+	"authors": [
+		"Stefan Koch"
+	],
+	"description": "RTE-POC",
+	"copyright": "Copyright © 2019, Stefan Koch",
+	"libs" : ["microhttpd"],
+	"license": "proprietary"
+}
