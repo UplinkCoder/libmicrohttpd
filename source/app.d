@@ -18,6 +18,8 @@ int main(string[] args)
 	if (!mhd) return 1;
 
 	{
+        handler_cls.add_route("/hello", transform_handler!handler);
+
 		handler_cls.add_route("/help", cast(PageCallback)(
 				const HandlerData hData
 			)
@@ -108,6 +110,20 @@ struct HandlerClosure
 			route_callbacks[route_string] = page_callback;
 		}
 	}
+}
+
+template transform_handler(alias h)
+{
+    enum transform_handler = cast(PageCallback)
+        (const HandlerData hData) { return h(cast(void*)hData.cls,
+        cast(MHD_Connection*)hData.connection,
+        hData.url,
+        hData.method,
+        hData.version_,
+        hData.upload_data,
+        cast(size_t*)hData.upload_data_size,
+        cast(void**)hData.con_cls);
+    };
 }
 
 extern (C) int handler (
