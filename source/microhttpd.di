@@ -161,15 +161,6 @@ enum MHD_SOCKET_DEFINED = 1;
 
 /* MHD_NO_DEPRECATION */
 
-/* Stringify macros */
-
-extern (D) auto _MHD_GCC_PRAG(T)(auto ref T x)
-{
-    import std.conv : to;
-
-    return _Pragma(to!string(x));
-}
-
 /* older clang or GCC */
 
 /* #elif defined(SOMEMACRO) */ /* add compiler-specific macros here if required */
