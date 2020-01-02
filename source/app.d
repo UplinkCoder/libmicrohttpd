@@ -20,6 +20,16 @@ int main(string[] args)
 	{
         handler_cls.add_route("/hello", transform_handler!handler);
 
+        handler_cls.add_route("/exit", cast(PageCallback) (
+                const HandlerData hData
+            )
+            {
+                we_are_out = 1;
+                return hData.connection.respond_with_text("<h1> exiting <h1>");
+            }
+
+        );
+
 		handler_cls.add_route("/help", cast(PageCallback)(
 				const HandlerData hData
 			)
@@ -136,15 +146,12 @@ extern (C) int handler (
 {
 
 	string url_string = cast(string) url[0 .. strlen(url)];
-
-	if (url_string == "/exit")
-	{
-		we_are_out = 1;
-	}
+    MHD_Response *response;
 
 	auto have_seen = MHD_lookup_connection_value(connection,
 		MHD_ValueKind.MHD_COOKIE_KIND,
-		"HAVESEEN");
+		"HAVESEEN"
+    );
 
 	string have_seen_string = have_seen ? cast(string) have_seen[0 .. strlen(have_seen)] : "null";
 
@@ -152,21 +159,19 @@ extern (C) int handler (
 		"<br /> Url: " ~ url_string ~ 
 		"<br /> HaveSeen: " ~ have_seen_string ~ "</body></html>";
 
+    response = MHD_create_response_from_buffer (page.length,
+        cast(void*) page.ptr, MHD_ResponseMemoryMode.MHD_RESPMEM_PERSISTENT);
 
-	MHD_Response *response;
+    if (have_seen != "YES")
+    {
+        MHD_add_response_header(response,
+            MHD_HTTP_HEADER_SET_COOKIE,
+            "HAVESEEN=YES"
+        );
+    }
+
+
 	int ret;
-
-	response = MHD_create_response_from_buffer (page.length,
-		cast(void*) page.ptr, MHD_ResponseMemoryMode.MHD_RESPMEM_PERSISTENT);
-
-	if (have_seen != "YES")
-	{
-		MHD_add_response_header(response, 
-			MHD_HTTP_HEADER_SET_COOKIE, 
-			"HAVESEEN=YES");
-	}
-
-
 	ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
 	MHD_destroy_response (response);
 	
