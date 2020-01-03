@@ -1,6 +1,8 @@
 ﻿module libmicrohttpd.server;
 import microhttpd;
 
+import core.stdc.string : memchr;
+
 __gshared int we_are_out = 0;
 
 struct HandlerData
@@ -13,7 +15,6 @@ struct HandlerData
     const (char) *upload_data;
     size_t *upload_data_size; 
     void **con_cls;
-    
 }
 
 struct Header
@@ -23,6 +24,33 @@ struct Header
 }
 
 alias PageCallback = int function (const HandlerData data);
+alias PrefixMathcingCallback = int function (const HandlerData data, const char[] afterPrefix);
+
+static const(char)[] truncAtFirst(const (char)[] data, char delim, const(char)[]* afterMatch =  null)
+{
+    const (char)[] result = data;
+
+    const pos_p = memchr(data.ptr, delim, data.length);
+    if (pos_p)
+    {
+        auto pos_i = pos_p - data.ptr;
+        result = data[0 .. pos_i];
+        if (afterMatch !is null)
+        {
+            (*afterMatch) = data[pos_i .. $];
+        }
+    }
+
+
+    return result;
+}
+///
+unittest
+{
+    assert(truncAtFirst("This is bullcrap", 'c') == "This is bull");
+    assert(truncAtFirst("This is bullcrap", ',') == "This is bullcrap");
+}
+
 
 extern (C) struct ServerCtx
 {
@@ -36,11 +64,14 @@ extern (C) struct ServerCtx
     
 
     PageCallback[string] route_callbacks;
+    PrefixMathcingCallback[string] prefix_callbacks;
+
     PageCallback fallback_callback = (
         const HandlerData hData
         )
     {
-        string url_string = cast(string) hData.url[0 .. strlen(hData.url)];
+        immutable url_length = strlen(hData.url);
+        string url_string = cast(string) hData.url[0 .. url_length];
         
         char[] page  = 
             cast(char[]) "<html><body>404 This page could not be found." ~
@@ -51,7 +82,9 @@ extern (C) struct ServerCtx
         return respond_with_text(hData.connection, page);
     };
 
-    MHD_Daemon* fire(ushort port)
+
+    /// Actually starts listening on the specified port
+    MHD_Daemon* listen(ushort port)
     {
         return mhd = 
             MHD_start_daemon(MHD_FLAG.MHD_USE_EPOLL_INTERNALLY_LINUX_ONLY,
@@ -82,9 +115,14 @@ extern (C) struct ServerCtx
         }
     }
 
-    void prefix_macthing_route(string prefix, PageCallback page_callack)
+    void prefix_macthing_route(string prefix, PrefixMathcingCallback prefix_callback)
     {
+        assert(prefix !in prefix_callbacks);
 
+        if (prefix[0] == '/')
+            prefix = prefix[1 .. $];
+
+        prefix_callbacks[prefix] = prefix_callback;
     }
 
     static extern (C) int handler (
@@ -102,10 +140,15 @@ extern (C) struct ServerCtx
         const HandlerData hData = HandlerData(cls, connection, url, method, version_, upload_data, upload_data_size, con_cls);
         
         int ret;
-        
+        const(char)[] afterPrefix;
+
         if (auto route_handler = url_string in server_ctx.route_callbacks)
         {
             ret = (*route_handler)(hData);
+        }
+        else if (auto route_handler = url_string.length > 1 ? (url_string[1 .. $].truncAtFirst('/', &afterPrefix) in server_ctx.prefix_callbacks) : null)
+        {
+            ret = (*route_handler)(hData, afterPrefix[1 .. $]);
         }
         else
         {

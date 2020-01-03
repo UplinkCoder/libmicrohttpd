@@ -53,11 +53,19 @@ int main(string[] args)
 			}
 		);
 
-            //server.add_route
+        server.prefix_macthing_route("/complements", cast(PrefixMathcingCallback) (
+                const HandlerData hData,
+                const char[] afterPrefix
+            )
+            {
+                return hData.connection.respond_with_text("<h2> Complements handler </h2>"
+                    ~ "<br /> url after prefix: '" ~ afterPrefix ~ "'");
+            }
+        );
 	}
 
 
-    auto mhd = server.fire(14321);
+    auto mhd = server.listen(14321);
     if (!mhd)
     {
         printf("could not start server on port 14321\n");
@@ -104,8 +112,6 @@ extern (C) int handler (
 
     if (have_seen_string != "YES")
     {
-        printf("HaveSeen : '%s'\n", have_seen);
-        page ~= "<br />Adding Header";
         headers = (&header)[0 .. 1];
     }
 
@@ -113,7 +119,5 @@ extern (C) int handler (
 
 
     return connection.respond_with_text(page, headers);
-
-
 }
 
