@@ -1,5 +1,12 @@
 ﻿module libmicrohttpd.server;
 import microhttpd;
+static int nullfd;
+
+shared static ~this()
+{
+    import core.sys.posix.unistd : close;
+    close(nullfd);
+}
 
 import core.stdc.string : memchr;
 
@@ -21,6 +28,32 @@ struct Header
 {
     const (char)* header;
     const (char)* content;
+}
+
+struct GetParam
+{
+    const (char)* key;
+    const (char)* value;
+}
+
+bool isGoodReadPtr(void* ptr)
+{
+    import core.sys.posix.fcntl;
+    import core.sys.posix.unistd;
+    if (!nullfd)
+    {
+        nullfd = open("/dev/random", O_WRONLY);
+    }
+    
+    return (write(nullfd, ptr, 1) >= 0);
+}
+
+///
+unittest
+{
+    int x;
+    assert(!isGoodReadPtr(null));
+    assert(isGoodReadPtr(&x));
 }
 
 alias PageCallback = int function (const HandlerData data);
@@ -148,7 +181,7 @@ extern (C) struct ServerCtx
         }
         else if (auto route_handler = url_string.length > 1 ? (url_string[1 .. $].truncAtFirst('/', &afterPrefix) in server_ctx.prefix_callbacks) : null)
         {
-            ret = (*route_handler)(hData, afterPrefix[1 .. $]);
+            ret = (*route_handler)(hData, afterPrefix.length >= 1 ? afterPrefix[1 .. $] : null);
         }
         else
         {
@@ -186,13 +219,14 @@ MHD_Response* prepare_response_with_text(const(char)[] page_text)
 }
 
 
-int respond_with_text(const MHD_Connection* connection, const(char)[] page_text, Header[] headers = null)
+int respond_with_text(const MHD_Connection* connection, const(char)[] page_text, Header[] headers = null,
+    MHD_ResponseMemoryMode response_memory_mode = MHD_ResponseMemoryMode.MHD_RESPMEM_MUST_COPY)
 {
     MHD_Response *response;
     int ret;
 
     response = MHD_create_response_from_buffer (page_text.length,
-        cast(void*) page_text.ptr, MHD_ResponseMemoryMode.MHD_RESPMEM_PERSISTENT);
+        cast(void*) page_text.ptr, response_memory_mode);
 
     foreach(header;headers)
     {

@@ -5,6 +5,7 @@
 	],
 	"description": "RTE-POC",
 	"copyright": "Copyright © 2019, Stefan Koch",
+    "flags" : ["-vgc"],
 	"libs" : ["microhttpd"],
 	"license": "proprietary"
 }
